@@ -1,20 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import {
   CheckCircle2,
   XCircle,
-  HelpCircle,
   RotateCcw,
   Sparkles,
-  Trophy,
-  ChevronRight,
   BookOpen,
-  ArrowRight,
-  Terminal,
-  Code2,
-  Laptop,
   Check,
   Lightbulb,
 } from 'lucide-react';
@@ -27,13 +19,12 @@ interface KidsExercisesViewProps {
   onSwitchLanguage?: (lang: 'python' | 'javascript' | 'java') => void;
 }
 
-export default function KidsExercisesView({ language, onSwitchLanguage }: KidsExercisesViewProps) {
+export default function KidsExercisesView({ language }: KidsExercisesViewProps) {
   const courseExercises = KIDS_EXERCISES[language];
   const [selectedSectionIndex, setSelectedSectionIndex] = useState<number>(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
   const [revealedHints, setRevealedHints] = useState<Record<string, boolean>>({});
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [dbSyncStatus, setDbSyncStatus] = useState<'synced' | 'saving' | 'offline'>('synced');
 
   // Load user profile and user-scoped exercise progress from Database
   useEffect(() => {
@@ -43,12 +34,10 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
       const uid = user ? user.id : 'usr_guest';
 
       try {
-        // 1. Load from QADatabase (Row-Level Security: scoped to user.id)
         const record = await QADatabase.getUserExerciseProgress(uid, language);
         if (record && record.userAnswers) {
           setUserAnswers(record.userAnswers);
         } else {
-          // If no local record, try server database endpoint
           const res = await fetch(`/api/db/user-data?userId=${encodeURIComponent(uid)}&type=exercises&language=${language}`).catch(() => null);
           if (res && res.ok) {
             const data = await res.json();
@@ -67,51 +56,27 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
     };
 
     fetchUserAndProgress();
-
-    // Listen for auth changes (login / logout) to switch user records immediately with zero data leakage
-    const handleAuthChange = () => {
-      fetchUserAndProgress();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('intelligentqa_auth_changed', handleAuthChange);
-      return () => {
-        window.removeEventListener('intelligentqa_auth_changed', handleAuthChange);
-      };
-    }
   }, [language]);
 
   const handleSelectOption = async (questionId: string, optionIndex: number) => {
     const updated = { ...userAnswers, [questionId]: optionIndex };
     setUserAnswers(updated);
-    setDbSyncStatus('saving');
 
     const uid = currentUser ? currentUser.id : 'usr_guest';
-
-    // Calculate score
-    const allQuestions = courseExercises.sections.flatMap((s) => s.questions);
     let correct = 0;
     allQuestions.forEach((q) => {
       if (updated[q.id] === q.correctIndex) correct++;
     });
-    const answeredCount = Object.keys(updated).length;
 
-    // Persist to Database with strict userId scoping
-    try {
-      await QADatabase.saveUserExerciseProgress(uid, language, updated, correct, answeredCount);
-      setDbSyncStatus('synced');
-    } catch {
-      setDbSyncStatus('offline');
-    }
+    await QADatabase.saveUserExerciseProgress(uid, language, updated, correct, Object.keys(updated).length);
   };
 
   const handleResetProgress = async () => {
-    if (window.confirm(`Are you sure you want to reset all your ${courseExercises.title} answers in the database?`)) {
+    if (confirm('Are you sure you want to reset your score and answer progress?')) {
       setUserAnswers({});
       setRevealedHints({});
       const uid = currentUser ? currentUser.id : 'usr_guest';
       await QADatabase.resetUserExerciseProgress(uid, language);
-      setDbSyncStatus('synced');
     }
   };
 
@@ -137,83 +102,83 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
   const currentSection = courseExercises.sections[selectedSectionIndex] || courseExercises.sections[0];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Header Banner */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-amber-400 font-mono">
+    <div className="space-y-8 animate-in fade-in duration-200">
+      {/* Header Banner - Emergent Card Scale */}
+      <div className="p-8 sm:p-10 rounded-[28px] bg-gradient-to-b from-[#181818] via-[#141414] to-[#101010] border border-[#262626] shadow-2xl space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-[#81FF89] font-mono">
               <Sparkles className="w-4 h-4" />
               <span>Interactive Knowledge Quizzes · 4-5 Questions Per Section</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
-              <span>{courseExercises.title}</span>
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight emergent-headline">
+              {courseExercises.title}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-2xl">
+            <p className="text-sm sm:text-base text-zinc-300 max-w-3xl leading-relaxed">
               {courseExercises.description}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-            <div className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/80 text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{currentUser ? `DB Saved: ${currentUser.displayName || currentUser.email}` : 'DB: Guest Mode'}</span>
+          <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+            <div className="px-3.5 py-1.5 rounded-full bg-[#1A1A1A] border border-[#2A2A2A] text-xs font-mono text-[#81FF89] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#81FF89] animate-pulse" />
+              <span>{currentUser ? `Saved: ${currentUser.displayName || currentUser.email}` : 'Guest Mode'}</span>
             </div>
 
             <button
               type="button"
               onClick={handleResetProgress}
-              className="py-1.5 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-              title="Reset answers in database to try exercises again"
+              className="py-2 px-4 rounded-full bg-[#1A1A1A] hover:bg-[#222222] text-zinc-300 border border-[#2A2A2A] text-sm font-medium flex items-center gap-2 transition cursor-pointer"
+              title="Reset answers to try exercises again"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Progress</span>
+              <RotateCcw className="w-4 h-4" />
+              <span>Reset</span>
             </button>
           </div>
         </div>
 
-        {/* Scoreboard Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-800/80">
-          <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-            <span className="text-[11px] text-slate-400 font-medium block">Completed</span>
-            <span className="text-lg font-black text-white">
-              {answeredCount} <span className="text-xs text-slate-500 font-normal">/ {totalQuestions}</span>
+        {/* Scoreboard Metrics - Emergent Tile Sizing */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[#262626]">
+          <div className="p-5 rounded-[20px] bg-[#1A1A1A] border border-[#2A2A2A]">
+            <span className="text-xs text-zinc-400 font-medium block">Completed</span>
+            <span className="text-2xl font-extrabold text-white">
+              {answeredCount} <span className="text-sm text-zinc-500 font-normal">/ {totalQuestions}</span>
             </span>
           </div>
 
-          <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-            <span className="text-[11px] text-slate-400 font-medium block">Score</span>
-            <span className="text-lg font-black text-emerald-400">
-              {correctCount} <span className="text-xs text-slate-500 font-normal">correct</span>
+          <div className="p-5 rounded-[20px] bg-[#1A1A1A] border border-[#2A2A2A]">
+            <span className="text-xs text-zinc-400 font-medium block">Score</span>
+            <span className="text-2xl font-extrabold text-[#81FF89]">
+              {correctCount} <span className="text-sm text-zinc-500 font-normal">correct</span>
             </span>
           </div>
 
-          <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-            <span className="text-[11px] text-slate-400 font-medium block">Accuracy</span>
-            <span className="text-lg font-black text-amber-400">
+          <div className="p-5 rounded-[20px] bg-[#1A1A1A] border border-[#2A2A2A]">
+            <span className="text-xs text-zinc-400 font-medium block">Accuracy</span>
+            <span className="text-2xl font-extrabold text-[#80FFF9]">
               {accuracyPct}%
             </span>
           </div>
 
-          <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-            <span className="text-[11px] text-slate-400 font-medium block">Course Progress</span>
-            <span className="text-lg font-black text-cyan-400">
+          <div className="p-5 rounded-[20px] bg-[#1A1A1A] border border-[#2A2A2A]">
+            <span className="text-xs text-zinc-400 font-medium block">Course Progress</span>
+            <span className="text-2xl font-extrabold text-white">
               {progressPct}%
             </span>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div className="w-full bg-[#202020] rounded-full h-2.5 overflow-hidden">
           <div
-            className="bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 h-2 rounded-full transition-all duration-300"
+            className="bg-gradient-to-r from-[#80FFF9] via-[#81FF89] to-[#00FF37] h-2.5 rounded-full transition-all duration-300"
             style={{ width: `${progressPct}%` }}
           />
         </div>
       </div>
 
-      {/* Section Navigation Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+      {/* Section Navigation Tabs - Emergent Pill Row */}
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
         {courseExercises.sections.map((section, idx) => {
           const sectionQuestions = section.questions;
           const sectionAnswered = sectionQuestions.filter((q) => userAnswers[q.id] !== undefined).length;
@@ -224,16 +189,16 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
               key={idx}
               type="button"
               onClick={() => setSelectedSectionIndex(idx)}
-              className={`py-2 px-3.5 rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-2 cursor-pointer ${
+              className={`py-2.5 px-4 rounded-full text-sm font-semibold shrink-0 transition-all flex items-center gap-2 cursor-pointer ${
                 isSelected
-                  ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
-                  : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-850'
+                  ? 'bg-white text-black shadow-md font-bold'
+                  : 'bg-[#161616] border border-[#262626] text-zinc-300 hover:bg-[#202020]'
               }`}
             >
               <span>{section.name.split(':')[0]}</span>
               <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-                  isSelected ? 'bg-black/20 text-inherit' : 'bg-slate-800 text-slate-400'
+                className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                  isSelected ? 'bg-black/15 text-inherit' : 'bg-[#222222] text-zinc-400'
                 }`}
               >
                 {sectionAnswered}/{sectionQuestions.length}
@@ -243,17 +208,17 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
         })}
       </div>
 
-      {/* Active Section Questions */}
-      <div className="space-y-4">
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+      {/* Active Section Header */}
+      <div className="space-y-5">
+        <div className="p-5 sm:p-6 rounded-[22px] bg-[#161616] border border-[#262626] flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-amber-400" />
+            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2.5">
+              <BookOpen className="w-5 h-5 text-[#81FF89]" />
               <span>{currentSection.name}</span>
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">{currentSection.description}</p>
+            <p className="text-sm text-zinc-400 mt-1">{currentSection.description}</p>
           </div>
-          <span className="text-xs text-slate-400 font-mono font-bold bg-slate-800 px-2.5 py-1 rounded-lg">
+          <span className="text-xs text-zinc-300 font-mono font-bold bg-[#202020] border border-[#2C2C2C] px-3 py-1.5 rounded-full">
             {currentSection.questions.length} Questions
           </span>
         </div>
@@ -267,35 +232,35 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
           return (
             <div
               key={q.id}
-              className={`p-5 rounded-2xl border transition-all ${
+              className={`emergent-card p-6 sm:p-8 space-y-5 transition-all ${
                 isAnswered
                   ? isCorrect
-                    ? 'bg-emerald-950/20 border-emerald-500/40'
-                    : 'bg-rose-950/20 border-rose-500/40'
-                  : 'bg-slate-900 border-slate-800 hover:border-slate-750'
-              } shadow-sm space-y-4`}
+                    ? 'border-[#81FF89]/50 bg-[#141d16]'
+                    : 'border-rose-500/40 bg-[#1c1214]'
+                  : 'hover:border-[#333333]'
+              }`}
             >
               {/* Question Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs font-mono font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-white/5 text-zinc-300 border border-white/10">
                       Q{qIndex + 1} · {q.topic}
                     </span>
                     {isAnswered && (
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                        className={`text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 ${
                           isCorrect
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            ? 'bg-[#81FF89]/20 text-[#81FF89] border border-[#81FF89]/30'
                             : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                         }`}
                       >
-                        {isCorrect ? <Check className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {isCorrect ? <Check className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                         <span>{isCorrect ? 'Correct!' : 'Incorrect'}</span>
                       </span>
                     )}
                   </div>
-                  <h3 className="text-sm sm:text-base font-bold text-white pt-1">
+                  <h3 className="text-base sm:text-lg font-bold text-white pt-1 leading-snug">
                     {q.question}
                   </h3>
                 </div>
@@ -304,43 +269,43 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
                   <button
                     type="button"
                     onClick={() => toggleHint(q.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition text-xs shrink-0 cursor-pointer"
+                    className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-[#222222] transition shrink-0 cursor-pointer border border-transparent hover:border-[#333333]"
                     title="Click to toggle hint"
                   >
-                    <Lightbulb className="w-4 h-4" />
+                    <Lightbulb className="w-4 h-4 text-[#81FF89]" />
                   </button>
                 )}
               </div>
 
               {/* Code Snippet (if available) */}
               {q.codeSnippet && (
-                <pre className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 overflow-x-auto whitespace-pre">
+                <pre className="p-4 rounded-2xl bg-[#0D0D0D] border border-[#262626] font-mono text-sm text-[#80FFF9] overflow-x-auto whitespace-pre leading-relaxed">
                   {q.codeSnippet}
                 </pre>
               )}
 
               {/* Hint Callout (if toggled) */}
               {revealedHints[q.id] && q.hint && (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs flex items-start gap-2">
-                  <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="p-4 rounded-2xl bg-[#81FF89]/10 border border-[#81FF89]/25 text-zinc-200 text-sm flex items-start gap-2.5 leading-relaxed">
+                  <Lightbulb className="w-4 h-4 text-[#81FF89] shrink-0 mt-0.5" />
                   <span><strong>Hint:</strong> {q.hint}</span>
                 </div>
               )}
 
-              {/* Multiple Choice Options */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {/* Multiple Choice Options - Spacious Pill Rectangles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 {q.options.map((option, optIdx) => {
                   const isSelected = selectedAnswer === optIdx;
                   const isThisOptionCorrect = optIdx === q.correctIndex;
 
-                  let optionStyle = 'bg-slate-950/70 border-slate-800 hover:border-slate-700 text-slate-200';
+                  let optionStyle = 'bg-[#181818] border-[#2A2A2A] hover:border-[#3A3A3A] hover:bg-[#1E1E1E] text-zinc-200';
                   if (isAnswered) {
                     if (isThisOptionCorrect) {
-                      optionStyle = 'bg-emerald-500/20 border-emerald-500 text-emerald-200 font-bold';
+                      optionStyle = 'bg-[#81FF89]/15 border-[#81FF89] text-[#81FF89] font-bold';
                     } else if (isSelected) {
-                      optionStyle = 'bg-rose-500/20 border-rose-500 text-rose-200 font-bold';
+                      optionStyle = 'bg-rose-500/20 border-rose-500 text-rose-300 font-bold';
                     } else {
-                      optionStyle = 'bg-slate-950/40 border-slate-800/60 text-slate-500 opacity-60';
+                      optionStyle = 'bg-[#141414] border-[#222222] text-zinc-500 opacity-50';
                     }
                   }
 
@@ -349,20 +314,20 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
                       key={optIdx}
                       type="button"
                       onClick={() => handleSelectOption(q.id, optIdx)}
-                      className={`p-3 rounded-xl border text-xs text-left transition flex items-center justify-between gap-2 cursor-pointer ${optionStyle}`}
+                      className={`p-4 rounded-2xl border text-sm sm:text-base text-left transition flex items-center justify-between gap-3 cursor-pointer ${optionStyle}`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-5 h-5 rounded-md bg-slate-800 flex items-center justify-center font-mono text-[10px] text-slate-400 shrink-0">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-lg bg-[#222222] flex items-center justify-center font-mono text-xs text-zinc-300 font-semibold shrink-0">
                           {String.fromCharCode(65 + optIdx)}
                         </span>
                         <span>{option}</span>
                       </div>
 
                       {isAnswered && isThisOptionCorrect && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-[#81FF89] shrink-0" />
                       )}
                       {isAnswered && isSelected && !isThisOptionCorrect && (
-                        <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
                       )}
                     </button>
                   );
@@ -372,13 +337,13 @@ export default function KidsExercisesView({ language, onSwitchLanguage }: KidsEx
               {/* Explanation Dropdown on Answer */}
               {isAnswered && (
                 <div
-                  className={`p-3.5 rounded-xl text-xs leading-relaxed border ${
+                  className={`p-4 rounded-2xl text-sm leading-relaxed border ${
                     isCorrect
-                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-200'
-                      : 'bg-slate-950 border-slate-800 text-slate-300'
+                      ? 'bg-[#81FF89]/10 border-[#81FF89]/25 text-zinc-200'
+                      : 'bg-[#141414] border-[#2A2A2A] text-zinc-300'
                   }`}
                 >
-                  <strong className={isCorrect ? 'text-emerald-400' : 'text-amber-400'}>
+                  <strong className={isCorrect ? 'text-[#81FF89]' : 'text-amber-400'}>
                     Explanation:
                   </strong>{' '}
                   {q.explanation}

@@ -17,11 +17,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
-        <Suspense fallback={<header className="h-16 bg-slate-900 border-b border-slate-800" />}>
+      <body className="min-h-screen bg-[#111111] text-[#FFFFFF] font-sans antialiased selection:bg-[#81FF89]/30 selection:text-[#81FF89]">
+        <Suspense fallback={<header className="h-20 bg-[#111111] border-b border-[#262626]" />}>
           <SmartCodersHeader />
         </Suspense>
-        <main className="min-h-[calc(100vh-64px)] flex flex-col">{children}</main>
+        <main className="min-h-[calc(100vh-80px)] flex flex-col">{children}</main>
         {/* Floating Ask AI Coding Assistant Widget */}
         <AskAIWidget />
       </body>
