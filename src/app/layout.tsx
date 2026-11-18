@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import SmartCodersHeader from '@/components/layout/header';
 import AskAIWidget from '@/components/home/ask-ai-widget';
@@ -17,7 +18,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
-        <SmartCodersHeader />
+        <Suspense fallback={<header className="h-16 bg-slate-900 border-b border-slate-800" />}>
+          <SmartCodersHeader />
+        </Suspense>
         <main className="min-h-[calc(100vh-64px)] flex flex-col">{children}</main>
         {/* Floating Ask AI Coding Assistant Widget */}
         <AskAIWidget />
